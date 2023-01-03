@@ -1,0 +1,175 @@
+default: "help"
+expose: ["help", "info", "build", "release", "publish"]
+
+configuration: ["~/.dockerhub.yml"] # DO NOT COMMIT THESE FILES
+# ~/.dockerhub.yml should contains:
+# DOCKERHUB_USER: <your dockerhub user>
+# DOCKERHUB_PASS: <your dockerhub password or a dockerhub token>
+
+properties:
+  # Build Configuration (edit this section to override default values)
+  BY: "" # Leave empty to default to the user.email property in git configuration
+  MODULE: "" # Leave empty to default to the git remote url (e.g. "github.com/<usename>/<reponame>")
+  PROJECT: "" # Leave empty to default to the git repository name (e.g. "<reponame>")
+  AUTHOR: "" # Leave empty to default to the git account name (e.g. "<usename>")
+
+  # Build parameters (use the -props flag or change these default values)
+  tag: "" # Default to the current branch or tag, can be overriden
+  latest: false # Do not tag the Docker image with latest, specify othewise with `-props "{latest: true}"`
+  snapshot: false # If true, do not upload release when publish target is used
+
+targets:
+  help:
+    doc: "Print this message"
+    steps:
+      # - $: 'neon -info' => incorrect order, issue to open
+      - $: echo TODO
+
+  info:
+    doc: "Print build informations"
+    steps:
+      - if: tag == ""
+        then:
+          - $: "git describe --tags --exact-match 2>/dev/null || git symbolic-ref -q --short HEAD"
+            1=: "tag"
+            3x: true
+        else:
+          - $: "echo -n ={tag}"
+            1=: "tag"
+            3x: true
+      - $: 'echo -n "={tag}" | sed -e s/^v//'
+        1=: "version"
+        3x: true
+      - $: "git rev-parse HEAD 2>/dev/null"
+        1=: "commit"
+        3x: true
+      - "date = now()[0:10]"
+      - if: BY == ""
+        then:
+          - $: "git config user.email"
+            1=: "by"
+            3x: true
+        else:
+          - $: "echo -n ={BY}"
+            1=: "by"
+            3x: true
+      - $: 'if expr match "={version}" "v\?[0-9]\+\.[0-9]\+\.[0-9]\+" 1>/dev/null 2>&1; then echo -n "yes"; else echo -n "no"; fi'
+        1=: "is_release"
+        3x: true
+      - $: "cut -f1 -d."
+        <: "=version"
+        1=: "version_major"
+        3x: true
+      - $: "cut -f2 -d."
+        <: "=version"
+        1=: "version_minor"
+        3x: true
+      - $: "cut -f3 -d."
+        <: "=version"
+        1=: "version_patch"
+        3x: true
+      - if: MODULE == ""
+        then:
+          - $: "git config --local remote.origin.url | sed -e 's#^.\\+://##' -e 's/.git$//' | tr '[:upper:]' '[:lower:]'"
+            1=: "mod"
+            3x: true
+        else:
+          - $: "echo -n ={MODULE}"
+            1=: "mod"
+            3x: true
+      - if: PROJECT == ""
+        then:
+          - $: "cut -f3 -d/"
+            <: "=mod"
+            1=: "project"
+            3x: true
+        else:
+          - $: "echo -n ={PROJECT}"
+            1=: "project"
+            3x: true
+      - if: AUTHOR == ""
+        then:
+          - $: "cut -f2 -d/"
+            <: "=mod"
+            1=: "author"
+            3x: true
+        else:
+          - $: "echo -n ={PROJECT}"
+            1=: "author"
+            3x: true
+      - print: |-
+          MODULE  = ={mod}
+          PROJECT = ={project}
+          AUTHOR  = ={author}
+          TAG     = ={tag}
+          COMMIT  = ={commit}
+          DATE    = ={date}
+          BY      = ={by}
+          RELEASE = ={is_release}
+      - if: 'is_release == "yes"'
+        then:
+          - print: |-
+              VERSION = ={version_major}.={version_minor}.={version_patch}
+
+  # run "neon -props '{latest: true}' build" to include latest tag
+  build:
+    doc: "Build docker images locally"
+    unless: 'newer(find(".", "~/build/last-*"), find(".", "Dockerfile*", "**/*.sh", ".zshrc", ".p10k.zsh"))'
+    depends: "info"
+    steps:
+      - print: "Executing build target"
+        color: cyan
+      - mkdir: "~/build"
+      - $: "sudo docker build -f Dockerfile -q --iidfile ~/build/last-ci -t ={author}/={project}-ci:local --target ={project}-ci ."
+      - $: "sudo docker build -f Dockerfile -q --iidfile ~/build/last-default -t ={author}/={project}:local --target ={project} ."
+
+  # run "neon -props '{latest: true}' release" to include latest tag
+  release:
+    doc: "Build docker images locally with tagged versions"
+    # unless: 'is_release != "yes"' => is_release unknown variable, issue to open
+    depends: ["info", "build"]
+    steps:
+      - if: 'is_release == "yes"'
+        then:
+          - if: "latest"
+            then:
+              - $: "sudo docker tag ={author}/={project}-ci:local ={DOCKERHUB_USER}/={project}-ci:latest"
+              - $: "sudo docker tag ={author}/={project}:local ={DOCKERHUB_USER}/={project}:latest"
+          - $: "sudo docker tag ={author}/={project}-ci:local ={DOCKERHUB_USER}/={project}-ci:v={version_major}"
+          - $: "sudo docker tag ={author}/={project}-ci:local ={DOCKERHUB_USER}/={project}-ci:v={version_major}.={version_minor}"
+          - $: "sudo docker tag ={author}/={project}-ci:local ={DOCKERHUB_USER}/={project}-ci:v={version_major}.={version_minor}.={version_patch}"
+          - $: "sudo docker images --no-trunc | grep $(cat ~/build/last-ci)"
+          - $: "sudo docker tag ={author}/={project}:local ={DOCKERHUB_USER}/={project}:v={version_major}"
+          - $: "sudo docker tag ={author}/={project}:local ={DOCKERHUB_USER}/={project}:v={version_major}.={version_minor}"
+          - $: "sudo docker tag ={author}/={project}:local ={DOCKERHUB_USER}/={project}:v={version_major}.={version_minor}.={version_patch}"
+          - $: "sudo docker images --no-trunc | grep $(cat ~/build/last-default)"
+        else:
+          - print: "Skipping release target (not a release)"
+            color: red
+
+  docker-login:
+    steps:
+      - $: "sudo docker login -u ={DOCKERHUB_USER} -p ={DOCKERHUB_PASS}"
+        2x: true
+
+  # run "neon -props '{latest: true}' publish" to include latest tag
+  publish:
+    doc: "Publish docker images to Dockerhub"
+    # unless: 'is_release != "yes"' => is_release unknown variable, issue to open
+    depends: ["info", "release", "docker-login"]
+    steps:
+      - if: 'is_release == "yes"'
+        then:
+          - $: "sudo docker push ={DOCKERHUB_USER}/={project}:v={version_major}"
+          - $: "sudo docker push ={DOCKERHUB_USER}/={project}:v={version_major}.={version_minor}"
+          - $: "sudo docker push ={DOCKERHUB_USER}/={project}:v={version_major}.={version_minor}.={version_patch}"
+          - $: "sudo docker push ={DOCKERHUB_USER}/={project}-ci:v={version_major}"
+          - $: "sudo docker push ={DOCKERHUB_USER}/={project}-ci:v={version_major}.={version_minor}"
+          - $: "sudo docker push ={DOCKERHUB_USER}/={project}-ci:v={version_major}.={version_minor}.={version_patch}"
+          - if: "latest"
+            then:
+              - $: "sudo docker push ={DOCKERHUB_USER}/={project}-ci:latest"
+              - $: "sudo docker push ={DOCKERHUB_USER}/={project}:latest"
+        else:
+          - print: "Skipping release target (not a release)"
+            color: red

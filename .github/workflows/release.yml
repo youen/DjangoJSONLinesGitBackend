@@ -1,0 +1,55 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Release
+
+# Controls when the action will run.
+on:
+  push:
+    tags:
+      - "*"
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - uses: FranzDiebold/github-env-vars-action@v2
+      - name: Publish
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          wget -O neon -nv https://github.com/c4s4/neon/releases/download/1.5.5/neon-linux-amd64
+          chmod +x neon
+          echo "DOCKERHUB_USER: adrienaury" > ~/.dockerhub.yml
+          echo "DOCKERHUB_PASS: ${DOCKERHUB_TOKEN}" >> ~/.dockerhub.yml
+          ./neon -props "{tag: ${CI_ACTION_REF_NAME}, MODULE: github.com/${CI_REPOSITORY,,}, BY: $(echo ${CI_ACTOR} | tr -d '[]'), latest: true}" publish
+
+      # - name: Build
+      #   run: docker build -t ci .
+
+      # - name: Start services
+      #   run: docker run -v "$(pwd):/workspace" -v /var/run/docker.sock:/var/run/docker.sock:ro --name ci --rm -d ci tail -f /dev/null
+
+      # - uses: FranzDiebold/github-env-vars-action@v2
+      # - name: Release
+      #   env:
+      #     DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      #   run: |
+      #     docker exec ci bash -c 'echo "DOCKERHUB_USER: adrienaury" > ~/.dockerhub.yml'
+      #     docker exec -e DOCKERHUB_TOKEN=${DOCKERHUB_TOKEN} ci bash -c 'echo "DOCKERHUB_PASS: ${DOCKERHUB_TOKEN}" >> ~/.dockerhub.yml'
+      #     docker exec \
+      #       -w /workspace \
+      #       ci \
+      #       neon -props "{tag: ${CI_ACTION_REF_NAME}, MODULE: github.com/${CI_REPOSITORY,,}, BY: $(echo ${CI_ACTOR} | tr -d '[]'), latest: true}" publish
