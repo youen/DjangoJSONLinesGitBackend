@@ -11,8 +11,9 @@ setup(
     author='Youen Péron',
     author_email='youen.peron@gmail.com',
     install_requires=[
-        'Django==4.1',
-        'pandas==1.5',
+        'Django>=4.1',
+        'pandas>=1.5',
+        'GitPython>=3.1.3'
     ],
     classifiers=[
         'Environment :: Web Environment',

@@ -37,8 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'application',
-    'plane_tiket_tracker'
+    'example.application',
 ]
 
 MIDDLEWARE = [
@@ -51,7 +50,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'project.urls'
+ROOT_URLCONF = 'example.urls'
 
 TEMPLATES = [
     {
@@ -69,11 +68,12 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'project.wsgi.application'
+WSGI_APPLICATION = 'example.wsgi.application'
 
 
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
+
 
 DATABASES = {
     'default': {
@@ -81,19 +81,24 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     },
     'json-git-read': {
-        'ENGINE': 'jsongit.read',
+        'ENGINE': 'DjangoJSONLinesGitBackend.read',
         'NAME': BASE_DIR / 'data',
+        'TEST': {
+            'NAME':  BASE_DIR / 'data',
+        }
 
     },
 
     'json-git': {
-        'ENGINE': 'jsongit.write',
+        'ENGINE': 'DjangoJSONLinesGitBackend.write',
         'NAME': BASE_DIR / 'data',
-
+        'TEST': {
+            'NAME':  BASE_DIR / 'data-test',
+        }
     }
 }
 
-DATABASE_ROUTERS = ['project.routers.JsonDbRouter']
+DATABASE_ROUTERS = ['example.routers.JsonDbRouter']
 
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators

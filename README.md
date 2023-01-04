@@ -5,13 +5,15 @@ A backend for the Django ORM that uses Git to persist data and serializes tables
 ## Prerequisites
 
 - Python 3.6 or later
-- Django 3.0 or later
+- Django 4.0 or later
 
 ## Installation
 
 To install DjangoJSONLinesGitBackend, run the following command:
 
+```console
 pip install git+https://github.com/youen/DjangoJSONLinesGitBackend.git
+```
 
 ## Configuration
 
@@ -28,13 +30,13 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     },
     'json-git-read': {
-        'ENGINE': 'JSONLinesGitBackend.read',
+        'ENGINE': 'DjangoJSONLinesGitBackend.read',
         'NAME': BASE_DIR / 'data',
 
     },
 
     'json-git': {
-        'ENGINE': 'JSONLinesGitBackend.write',
+        'ENGINE': 'DjangoJSONLinesGitBackend.write',
         'NAME': BASE_DIR / 'data',
 
     }
@@ -97,6 +99,20 @@ import uuid
 class MyModel(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 ```
+
+## Migration
+
+To apply migrations to the 'json-git' database for the 'application' app, run the following command:
+
+```console
+$ python manage.py migrate --database json-git application
+Operations to perform:
+  Apply all migrations: application
+Running migrations:
+  Applying application.0001_initial... OK
+```
+
+This will apply any pending migrations to the 'json-git' database for the models in the 'application' app.
 
 ## Contribution
 
